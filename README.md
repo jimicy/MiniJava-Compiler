@@ -4,6 +4,9 @@ Jimmy Wang
 
 April 2016
 
+##Literate Programming Documentation
+View at https://rawgit.com/Jimicy/MiniJava-Compiler/master/docs/main.html
+
 ##Introduction
 MiniJava is a subset of Java. It's BNF can be found at [http://www.cambridge.org/resources/052182060X/MCIIJ2e/grammar.htm](http://www.cambridge.org/resources/052182060X/MCIIJ2e/grammar.htm)
 
