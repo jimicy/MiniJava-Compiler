@@ -1,0 +1,7 @@
+#!/bin/bash
+
+./main "$1"
+name=$(basename "$1" .java)
+opt-3.6 -S -O3 $name.ll -o $name.ll
+llc-3.6 -filetype=obj $name.ll
+g++ $name.o -o $name

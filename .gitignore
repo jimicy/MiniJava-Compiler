@@ -1,0 +1,12 @@
+ex*
+makeex*
+main
+codegen
+parser.cpp
+parser.hpp
+tokens.cpp
+*.o
+*.dSYM
+*.txt
+*.class
+*.ll

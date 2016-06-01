@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>ast.h</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+              
+                
+                <a class="source" href="CodeGen.html">
+                  CodeGen.cpp
+                </a>
+              
+                
+                <a class="source" href="CodeGen_h.html">
+                  CodeGen.h
+                </a>
+              
+                
+                <a class="source" href="ast.html">
+                  ast.cpp
+                </a>
+              
+                
+                <a class="source" href="ast_h.html">
+                  ast.h
+                </a>
+              
+                
+                <a class="source" href="main.html">
+                  main.cpp
+                </a>
+              
+                
+                <a class="source" href="main_h.html">
+                  main.h
+                </a>
+              
+                
+                <a class="source" href="parser.html">
+                  parser.y
+                </a>
+              
+                
+                <a class="source" href="tokens.html">
+                  tokens.l
+                </a>
+              
+            </div>
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>ast.h</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#ifndef AST_H</span>
+<span class="hljs-meta">#define AST_H</span>
+
+<span class="hljs-meta">#include <span class="hljs-meta-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#include <span class="hljs-meta-string">&lt;stdint.h&gt;</span></span>
+<span class="hljs-meta">#include <span class="hljs-meta-string">&lt;stdbool.h&gt;</span></span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">enum</span> {
+	VAR_UNKNOWN = <span class="hljs-number">0</span>, <span class="hljs-comment">// default should flip out</span>
+	VAR_VOID,
+	VAR_STRING_ARRAY,
+	VAR_BOOL,
+	VAR_INT,
+	VAR_INT_ARRAY,
+	VAR_CLASS
+} ast_var_type;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> {
+	ast_var_type type;
+	<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *classname; <span class="hljs-comment">// Used by VAR_CLASS</span>
+} ast_type;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">enum</span> {
+	INT_CO<span class="hljs-built_in">NST</span>,
+	BOOL_CO<span class="hljs-built_in">NST</span>,
+	VARNAME,
+	THIS_PTR,
+	NOT_EXPR,
+	NEW_CLASS,
+	NEW_INT_ARRAY,
+	ARRAY_LENGTH,
+	ARRAY_INDEX,
+	METHOD_<span class="hljs-built_in">CALL</span>,
+	BINOP,
+} ast_expr_type;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> ast_expr {
+	<span class="hljs-keyword">int</span> lineno;
+	ast_expr_type type;
+	ast_type expr_type; <span class="hljs-comment">// Used during typecheck</span>
+	<span class="hljs-keyword">union</span> {
+		int int_const; <span class="hljs-comment">// INT_CONST</span>
+		<span class="hljs-keyword">bool</span> bool_const; <span class="hljs-comment">// BOOL_CONST</span>
+		<span class="hljs-keyword">struct</span> {
+			<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *<span class="hljs-keyword">id</span>; <span class="hljs-comment">// VARNAME, NEW_CLASS</span>
+		};
+		<span class="hljs-keyword">struct</span> ast_expr *expr; <span class="hljs-comment">// NOT_EXPR / NEW_INT_ARRAY / ARRAY_LENGTH</span>
+		<span class="hljs-keyword">struct</span> { <span class="hljs-comment">// METHOD_CALL</span>
+			<span class="hljs-keyword">struct</span> ast_expr *object;
+			<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *method;
+			<span class="hljs-keyword">struct</span> ast_expr *exp_list;
+		};
+		<span class="hljs-keyword">struct</span> { <span class="hljs-comment">// BINOP</span>
+			<span class="hljs-keyword">struct</span> ast_expr *lhs, *rhs;
+			<span class="hljs-keyword">int</span> oper;
+		};
+		<span class="hljs-keyword">struct</span> { <span class="hljs-comment">// ARRAY_INDEX</span>
+			<span class="hljs-keyword">struct</span> ast_expr *array, *array_index;
+		};
+	};
+	<span class="hljs-keyword">struct</span> ast_expr *next; <span class="hljs-comment">// Non-NULL =&gt; ExpList</span>
+} ast_expr;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">enum</span> {
+	BLOCK,
+	IF_ELSE,
+	WHILE_STMT,
+	SYS_OUT,
+	VAR_ASSIGN,
+	ARRAY_ASSIGN,
+} ast_stmt_type;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> ast_stmt {
+	<span class="hljs-keyword">int</span> lineno;
+	ast_stmt_type type;
+	<span class="hljs-keyword">union</span> {
+		<span class="hljs-keyword">struct</span> ast_stmt *stmt_list; <span class="hljs-comment">// BLOCK</span>
+		<span class="hljs-keyword">struct</span> { <span class="hljs-comment">// IF_ELSE / WHILE</span>
+			ast_expr *cond; 
+			<span class="hljs-keyword">union</span> {
+				<span class="hljs-keyword">struct</span> ast_stmt *while_branch; <span class="hljs-comment">// WHILE</span>
+				<span class="hljs-keyword">struct</span> { <span class="hljs-comment">// IF_ELSE</span>
+					<span class="hljs-keyword">struct</span> ast_stmt *true_branch, *false_branch;
+				};
+			};
+		};
+		<span class="hljs-keyword">struct</span> { <span class="hljs-comment">// VAR_ASSIGN / ARRAY_ASSIGN</span>
+			<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *<span class="hljs-keyword">id</span>;
+			ast_expr *array_index; <span class="hljs-comment">// ARRAY_ASSIGN</span>
+			ast_expr *assign_expr; <span class="hljs-comment">// VAR_ASSIGN / ARRAY_ASSIGN</span>
+		};
+		<span class="hljs-keyword">struct</span> ast_expr *expr; <span class="hljs-comment">// SYSO</span>
+	};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>Statement List. A linked list stores a reference to the next class. Terminates with NULL</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-keyword">struct</span> ast_stmt *next;
+} ast_stmt;
+
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> ast_vardecl {
+	<span class="hljs-keyword">int</span> lineno;
+	ast_type type;
+
+	<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *<span class="hljs-keyword">id</span>;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>VarList. A linked list stores a reference to the next class. Terminates with NULL</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-keyword">struct</span> ast_vardecl *next;
+} ast_vardecl;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> ast_methoddecl {
+	<span class="hljs-keyword">int</span> lineno;
+	ast_type type;
+	<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *<span class="hljs-keyword">id</span>;
+	ast_vardecl *params;
+	ast_vardecl *var_decl;
+	ast_stmt *body;
+	ast_expr *return_expr;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>MethodList. A linked list stores a reference to the next class. Terminates with NULL</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-keyword">struct</span> ast_methoddecl *next;
+} ast_methoddecl;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> ast_classdecl {
+	<span class="hljs-keyword">int</span> lineno;
+	<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *<span class="hljs-keyword">id</span>;
+
+	ast_vardecl *fields;
+	ast_methoddecl *methods;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>ClassList. A linked list stores a reference to the next class. Terminates with NULL</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-keyword">struct</span> ast_classdecl *next;
+} ast_classdecl;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span>
+{
+	<span class="hljs-keyword">int</span> lineno;
+	<span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *<span class="hljs-keyword">id</span>;
+	ast_methoddecl *method;
+} ast_mainclass;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> {
+	ast_mainclass main_class;
+	ast_classdecl *class_list;
+} ast_program;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>Preprocessor Macros for creating a specific AST struct</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+<span class="hljs-meta">#define EXPR_EMPTY(name, expr_type) ast_expr *name = new ast_expr; name-&gt;type = expr_type; name-&gt;lineno = yylineno; name-&gt;next = NULL;</span>
+<span class="hljs-meta">#define EXPR(name, type, assign) EXPR_EMPTY(name, type) name-&gt;assign;</span>
+
+<span class="hljs-meta">#define STATEMENT_EMPTY(name, stmt_type) ast_stmt *name = new ast_stmt; name-&gt;type = stmt_type; name-&gt;lineno = yylineno; name-&gt;next = NULL;</span>
+<span class="hljs-meta">#define STATEMENT(name, type, assign) STATEMENT_EMPTY(name, type) name-&gt;assign;</span>
+
+<span class="hljs-meta">#define VAR_DECLARATION(name, var_type, var_id) ast_vardecl *name = new ast_vardecl; name-&gt;type = var_type; name-&gt;id = var_id; name-&gt;lineno = yylineno; name-&gt;next = NULL;</span>
+
+<span class="hljs-meta">#define VAR_DECLARATION_THIS(name) ast_vardecl *name = new ast_vardecl; ast_type class_type; \</span>
+  class_type.type = VAR_CLASS; name-&gt;type = class_type; name-&gt;<span class="hljs-keyword">id</span> = <span class="hljs-string">"this"</span>; name-&gt;lineno = yylineno; name-&gt;next = <span class="hljs-literal">NULL</span>;
+
+<span class="hljs-meta">#define TYPE(name, var_type) ast_type name; name.type = var_type;</span>
+<span class="hljs-meta">#define CLASS(name, class_id) TYPE(name, VAR_CLASS); name.classname = class_id;</span>
+
+<span class="hljs-meta">#define METHOD_DECLARATION(name, method_type, method_id, method_params, method_vars, method_body, method_return) \</span>
+	ast_methoddecl *name = new ast_methoddecl; name-&gt;next = <span class="hljs-literal">NULL</span>; name-&gt;type = method_type; \
+	name-&gt;<span class="hljs-keyword">id</span> = method_id; name-&gt;params = method_params; name-&gt;var_decl = method_vars; \
+	name-&gt;body = method_body; name-&gt;lineno = yylineno; name-&gt;return_expr = method_return;
+
+<span class="hljs-meta">#define CLASS_DECLARATION(name, class_id, class_fields, class_methods) ast_classdecl *name = new ast_classdecl; \</span>
+	name-&gt;lineno = yylineno; name-&gt;next = <span class="hljs-literal">NULL</span>; name-&gt;<span class="hljs-keyword">id</span> = class_id; name-&gt;fields = class_fields; \
+	initialize_var_declaration_this(class_methods, class_id); \
+	name-&gt;methods = class_methods;
+
+<span class="hljs-meta">#define AST_PROGRAM(name, main, classlist) \</span>
+	ast_program name; name.main_class = main; name.class_list = classlist;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>Map the id of the parent class to <code>this</code> in Method(this, arg1, arg2,..)</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">void</span> initialize_var_declaration_this(ast_methoddecl *class_methods, <span class="hljs-keyword">char</span>* classname);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>Print the AST</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">void</span> ast_program_print(FILE *file, <span class="hljs-keyword">int</span> indent_level, ast_program *program);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>Return a string representation of the <code>ast_type</code> passed in</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span> *ast_type_str(ast_type type);
+
+<span class="hljs-meta">#endif</span></pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

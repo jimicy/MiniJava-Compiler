@@ -1,0 +1,2445 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>CodeGen.cpp</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+    <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+              
+                
+                <a class="source" href="CodeGen.html">
+                  CodeGen.cpp
+                </a>
+              
+                
+                <a class="source" href="CodeGen_h.html">
+                  CodeGen.h
+                </a>
+              
+                
+                <a class="source" href="ast.html">
+                  ast.cpp
+                </a>
+              
+                
+                <a class="source" href="ast_h.html">
+                  ast.h
+                </a>
+              
+                
+                <a class="source" href="main.html">
+                  main.cpp
+                </a>
+              
+                
+                <a class="source" href="main_h.html">
+                  main.h
+                </a>
+              
+                
+                <a class="source" href="parser.html">
+                  parser.y
+                </a>
+              
+                
+                <a class="source" href="tokens.html">
+                  tokens.l
+                </a>
+              
+            </div>
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>CodeGen.cpp</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-string">"CodeGen.h"</span></span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-2">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>Global scope tracking dictionaries</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,StructType*&gt; classScope = {};
+<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; methodScope = {};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-3">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>Takes an ast as a paramater and emits an LLVM IR version of the represented program.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">makeProgram</span><span class="hljs-params">(ast_program ast)</span></span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-4">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>Creating a global llvm ir module to store the program in</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">filename</span><span class="hljs-params">(ast.main_class.id)</span></span>;
+	filename = filename + <span class="hljs-string">".ll"</span>;
+	Module* mod = new Module(filename, getGlobalContext());</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-5">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>Creating header for the main function, it takes no arguments and returns a void type
+Note that the string array parameter normally passed to a java main function does not exist in minijava, and is syntactic sugar</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	FunctionType* funcType = FunctionType::get(ArrayType::getVoidTy(getGlobalContext()), false);
+	Function* main = Function::Create(funcType, Function::ExternalLinkage, <span class="hljs-string">"main"</span>, mod);
+	BasicBlock* entry = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">"entry"</span>, main);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-6">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-6">&#182;</a>
+              </div>
+              <p>We use varScope to store references to declared variables in any given scope</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; varScope = {};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-7">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-7">&#182;</a>
+              </div>
+              <p>Here we publically exposing the c printf function for use in our code</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Type*&gt;FuncTy_5_args;
+	FuncTy_5_args.push_back(PointerType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>), <span class="hljs-number">0</span>));
+	Function* func_printf = mod-&gt;getFunction(<span class="hljs-string">"printf"</span>);
+	<span class="hljs-keyword">if</span> (!func_printf) {
+		func_printf = Function::Create(FunctionType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">32</span>),FuncTy_5_args,true),GlobalValue::ExternalLinkage,<span class="hljs-string">"printf"</span>, mod);
+		func_printf-&gt;setCallingConv(CallingConv::C);
+	}
+	AttributeSet func_printf_PAL;
+	{
+	 SmallVector&lt;AttributeSet, <span class="hljs-number">4</span>&gt; Attrs;
+	 AttributeSet PAS;
+	  {
+	   AttrBuilder B;
+	   PAS = AttributeSet::get(mod-&gt;getContext(), ~<span class="hljs-number">0U</span>, B);
+	  }
+	 Attrs.push_back(PAS);
+	 func_printf_PAL = AttributeSet::get(mod-&gt;getContext(), Attrs);
+	}
+	func_printf-&gt;setAttributes(func_printf_PAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-8">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-8">&#182;</a>
+              </div>
+              <p>Here we publically exposing the c znam/new int[] function for use in our code</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Type*&gt;znmArgs;
+	znmArgs.push_back(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">64</span>));
+	FunctionType* znmHeader = FunctionType::get(PointerType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>), <span class="hljs-number">0</span>),znmArgs,false);
+
+	Function* func__Znam = mod-&gt;getFunction(<span class="hljs-string">"_Znam"</span>);
+	<span class="hljs-keyword">if</span> (!func__Znam) {
+	func__Znam = Function::Create(znmHeader,GlobalValue::ExternalLinkage,<span class="hljs-string">"_Znam"</span>, mod);
+	func__Znam-&gt;setCallingConv(CallingConv::C);
+	}
+	AttributeSet func__Znam_PAL;
+	{
+	 SmallVector&lt;AttributeSet, <span class="hljs-number">4</span>&gt; Attrs;
+	 AttributeSet PAS;
+	  {
+	   AttrBuilder B;
+	   B.addAttribute(Attribute::NoAlias);
+	   PAS = AttributeSet::get(mod-&gt;getContext(), <span class="hljs-number">0U</span>, B);
+	  }
+	 
+	 Attrs.push_back(PAS);
+	 {
+	  AttrBuilder B;
+	  PAS = AttributeSet::get(mod-&gt;getContext(), ~<span class="hljs-number">0U</span>, B);
+	 }
+	
+	Attrs.push_back(PAS);
+	func__Znam_PAL = AttributeSet::get(mod-&gt;getContext(), Attrs);
+	
+	}
+	func__Znam-&gt;setAttributes(func__Znam_PAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-9">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-9">&#182;</a>
+              </div>
+              <p>Here we publically exposing the c znam/new object function for use in our code</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	Function* func__Znwm = mod-&gt;getFunction(<span class="hljs-string">"_Znwm"</span>);
+	<span class="hljs-keyword">if</span> (!func__Znwm) {
+	func__Znwm = Function::Create(znmHeader,GlobalValue::ExternalLinkage,<span class="hljs-string">"_Znwm"</span>, mod); <span class="hljs-comment">// (external, no body)</span>
+	func__Znwm-&gt;setCallingConv(CallingConv::C);
+	}
+	AttributeSet func__Znwm_PAL;
+	{
+	 SmallVector&lt;AttributeSet, <span class="hljs-number">4</span>&gt; Attrs;
+	 AttributeSet PAS;
+	  {
+	   AttrBuilder B;
+	   B.addAttribute(Attribute::NoAlias);
+	   PAS = AttributeSet::get(mod-&gt;getContext(), <span class="hljs-number">0U</span>, B);
+	  }
+	 
+	 Attrs.push_back(PAS);
+	 {
+	  AttrBuilder B;
+	  PAS = AttributeSet::get(mod-&gt;getContext(), ~<span class="hljs-number">0U</span>, B);
+	 }
+	
+	Attrs.push_back(PAS);
+	func__Znwm_PAL = AttributeSet::get(mod-&gt;getContext(), Attrs);
+	
+	}
+	func__Znwm-&gt;setAttributes(func__Znwm_PAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-10">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-10">&#182;</a>
+              </div>
+              <p>Exposing llvms memory management function for use with znwm</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	Function* func_memset = mod-&gt;getFunction(<span class="hljs-string">"llvm.memset.p0i8.i64"</span>);
+	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Type*&gt;memsetTypeArgs;
+	memsetTypeArgs.push_back(PointerType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>), <span class="hljs-number">0</span>));
+	memsetTypeArgs.push_back(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>));
+	memsetTypeArgs.push_back(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">64</span>));
+	memsetTypeArgs.push_back(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">32</span>));
+	memsetTypeArgs.push_back(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">1</span>));
+	FunctionType* memsetType = FunctionType::get(Type::getVoidTy(mod-&gt;getContext()),memsetTypeArgs,false);
+	<span class="hljs-keyword">if</span> (!func_memset) {
+	func_memset = Function::Create(memsetType,GlobalValue::ExternalLinkage,<span class="hljs-string">"llvm.memset.p0i8.i64"</span>, mod); <span class="hljs-comment">// (external, no body)</span>
+	func_memset-&gt;setCallingConv(CallingConv::C);
+	}
+	AttributeSet func_memset_PAL;
+	{
+	 SmallVector&lt;AttributeSet, <span class="hljs-number">4</span>&gt; Attrs;
+	 AttributeSet PAS;
+	  {
+	   AttrBuilder B;
+	   B.addAttribute(Attribute::NoCapture);
+	   PAS = AttributeSet::get(mod-&gt;getContext(), <span class="hljs-number">1U</span>, B);
+	  }
+	 
+	 Attrs.push_back(PAS);
+	 {
+	  AttrBuilder B;
+	  B.addAttribute(Attribute::NoUnwind);
+	  PAS = AttributeSet::get(mod-&gt;getContext(), ~<span class="hljs-number">0U</span>, B);
+	 }
+
+	Attrs.push_back(PAS);
+	func_memset_PAL = AttributeSet::get(mod-&gt;getContext(), Attrs);
+
+	}
+	func_memset-&gt;setAttributes(func_memset_PAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-11">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-11">&#182;</a>
+              </div>
+              <p>Saving references to exposed functions</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	methodScope[<span class="hljs-string">"C:: printf"</span>] = func_printf;
+	methodScope[<span class="hljs-string">"C:: znam"</span>] = func__Znam;
+	methodScope[<span class="hljs-string">"C:: znwm"</span>] = func__Znwm;
+	methodScope[<span class="hljs-string">"llvm:: memset"</span>] = func_memset;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-12">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-12">&#182;</a>
+              </div>
+              <p>— Begin calls to delegate functions for parsing of AST —</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+
+	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,ConstantInt*&gt; classFields = {};</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-13">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-13">&#182;</a>
+              </div>
+              <p>Calling delegate functions to construct code for the classes that follow the main class</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_classdecl* classToDeclare = ast.class_list;
+	<span class="hljs-keyword">while</span> (classToDeclare!=<span class="hljs-literal">nullptr</span>){
+		makeClassHeader(mod,classToDeclare,classFields);
+		classToDeclare = classToDeclare-&gt;next;
+	}
+
+	classToDeclare = ast.class_list;
+	<span class="hljs-keyword">while</span> (classToDeclare!=<span class="hljs-literal">nullptr</span>){
+		<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; newScope = varScope;
+		makeClassBody(mod,classToDeclare,newScope,classFields);
+		classToDeclare = classToDeclare-&gt;next;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-14">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-14">&#182;</a>
+              </div>
+              <p>Calling delegate functions to construct main method of main class</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_vardecl* varDecl = ast.main_class.method-&gt;var_decl;
+	BasicBlock* insertPoint = entry;
+	<span class="hljs-keyword">while</span> (varDecl != <span class="hljs-literal">nullptr</span>){
+		insertPoint = makeVarDeclaration(mod,varDecl,varScope,main,insertPoint);
+		varDecl = varDecl-&gt;next;
+	}
+
+	ast_stmt* stmt = ast.main_class.method-&gt;body;
+	
+	<span class="hljs-keyword">while</span> (stmt != <span class="hljs-literal">nullptr</span>){
+		insertPoint = makeStatement(mod,stmt,varScope,main,insertPoint);
+		stmt = stmt-&gt;next;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-15">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-15">&#182;</a>
+              </div>
+              <p>Returning void pointer</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ReturnInst::Create(mod-&gt;getContext(), insertPoint);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-16">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-16">&#182;</a>
+              </div>
+              <p>Now we dump the constructed ir code into a file</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-function">ofstream <span class="hljs-title">outFile</span><span class="hljs-params">(filename)</span></span>;
+	<span class="hljs-function">raw_os_ostream <span class="hljs-title">rawoutFile</span><span class="hljs-params">(outFile)</span></span>;
+	mod-&gt;print(rawoutFile, <span class="hljs-literal">nullptr</span>);
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-17">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-17">&#182;</a>
+              </div>
+              <p>Takes an ast for a class and declares it’s header properties
+This is separated from makeClassBody so that each class can be referenced from within any class body</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">makeClassHeader</span><span class="hljs-params">(Module* mod,ast_classdecl *classDecl,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,ConstantInt*&gt; &amp;classFields)</span></span>{
+	<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">classname</span><span class="hljs-params">(classDecl-&gt;id)</span></span>;
+	classname = <span class="hljs-string">"class."</span> +classname;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-18">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-18">&#182;</a>
+              </div>
+              <p>Creating struct for class field storage</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	StructType *classStruct = mod-&gt;getTypeByName(classname);
+	<span class="hljs-keyword">if</span> (!classStruct) {
+	classStruct = StructType::create(mod-&gt;getContext(), classname);
+	}
+	classScope[classname] = classStruct;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-19">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-19">&#182;</a>
+              </div>
+              <p>Declaring fields of class
+In classFields we store the index of the field relative to the class struct
+Later we can use this in a calculation to retireve the field from the struct</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>
+	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Type*&gt;classStruct_fields;
+	<span class="hljs-keyword">int</span> fieldNum = <span class="hljs-number">0</span>;
+	ast_vardecl* varDecl = classDecl-&gt;fields;
+	<span class="hljs-keyword">while</span> (varDecl != <span class="hljs-literal">nullptr</span>){
+		classStruct_fields.push_back(makeType(mod,varDecl-&gt;type));
+		<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">fieldName</span><span class="hljs-params">(varDecl-&gt;id)</span></span>;
+		classFields[fieldName] = ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(std::to_string(fieldNum++)), <span class="hljs-number">10</span>));
+		varDecl = varDecl-&gt;next;
+	}
+	<span class="hljs-keyword">if</span> (classStruct-&gt;isOpaque()) {
+		classStruct-&gt;setBody(classStruct_fields,<span class="hljs-literal">false</span>);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-20">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-20">&#182;</a>
+              </div>
+              <p>Declaring all the method headers, so they may be accessed immediately</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_methoddecl* method = classDecl-&gt;methods;
+	<span class="hljs-keyword">while</span> (method!=<span class="hljs-literal">nullptr</span>){
+		makeMethodHeaders(mod,method);
+		method = method-&gt;next;
+	}
+	method = classDecl-&gt;methods;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-21">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-21">&#182;</a>
+              </div>
+              <p>Takes an ast for a class and declares it’s methods</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">makeClassBody</span><span class="hljs-params">(Module* mod,ast_classdecl *classDecl,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; &amp;varScope,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,ConstantInt*&gt; &amp;classFields)</span></span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-22">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-22">&#182;</a>
+              </div>
+              <p>Calling delegate functions to declare each method</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_methoddecl* method = classDecl-&gt;methods;
+	<span class="hljs-keyword">while</span> (method!=<span class="hljs-literal">nullptr</span>){
+		makeMethodBody(mod,method,varScope,classFields);
+		method = method-&gt;next;
+	}
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-23">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-23">&#182;</a>
+              </div>
+              <p>Takes an ast for a method and declares it’s header properties
+This is separated from makeMethodBody so that each method can be referenced from within any method body</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">makeMethodHeaders</span><span class="hljs-params">(Module* mod, ast_methoddecl* methodDecl)</span></span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-24">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-24">&#182;</a>
+              </div>
+              <p>Declaring the arguments that this method takes</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Type*&gt; args;
+	ast_vardecl* param = methodDecl-&gt;params;
+	<span class="hljs-keyword">while</span> (param!=<span class="hljs-literal">nullptr</span>){
+		args.push_back(makeType(mod,param-&gt;type));
+		param = param-&gt;next;
+	}
+	FunctionType* funcType = FunctionType::get(makeType(mod,methodDecl-&gt;type),args,false);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-25">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-25">&#182;</a>
+              </div>
+              <p>Setting up calling convention for this method</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">funcName</span><span class="hljs-params">(methodDecl-&gt;id)</span></span>;
+	Function* func = mod-&gt;getFunction(funcName);
+	<span class="hljs-keyword">if</span> (!func) {
+		func = Function::Create(funcType,GlobalValue::LinkOnceODRLinkage,funcName, mod); 
+		func-&gt;setCallingConv(CallingConv::C);
+		func-&gt;setAlignment(<span class="hljs-number">2</span>);
+	}
+	AttributeSet funcPAL;
+	func-&gt;setAttributes(funcPAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-26">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-26">&#182;</a>
+              </div>
+              <p>Saving a reference to this function so it may be called later</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	methodScope[funcName] = func;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-27">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-27">&#182;</a>
+              </div>
+              <p>Takes an ast_methodDecl and constructs the methods body.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">makeMethodBody</span><span class="hljs-params">(Module* mod, ast_methoddecl* methodDecl,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; &amp;varScope,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,ConstantInt*&gt; &amp;classFields)</span></span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-28">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-28">&#182;</a>
+              </div>
+              <p>Getting references needed to start attatching to the methods body</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">funcName</span><span class="hljs-params">(methodDecl-&gt;id)</span></span>;
+	Function* func = <span class="hljs-keyword">dynamic_cast</span>&lt;Function*&gt;(methodScope[funcName]);
+	BasicBlock* entry = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>,func,<span class="hljs-number">0</span>);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-29">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-29">&#182;</a>
+              </div>
+              <p>Constructing code for retrieving method params and storing them in a local variable</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_vardecl* param = methodDecl-&gt;params;
+	Function::arg_iterator passedArgs = func-&gt;arg_begin();
+	<span class="hljs-keyword">while</span> (param!=<span class="hljs-literal">nullptr</span>){
+		Value* paramVal = passedArgs++;
+		<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">paramName</span><span class="hljs-params">(param-&gt;id)</span></span>;
+		paramVal-&gt;setName(<span class="hljs-string">"arg_"</span> + paramName);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-30">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-30">&#182;</a>
+              </div>
+              <p>Delegating the declaration of a local variable for the parameter</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		entry = makeVarDeclaration(mod,param,varScope,func,entry);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-31">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-31">&#182;</a>
+              </div>
+              <p>Customized variable assignment, essentially equivelant to the VAR_ASSIGN handler in makeStatemnt</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">int</span> numOfBits = paramVal-&gt;getType()-&gt;getPrimitiveSizeInBits();
+		numOfBits = (numOfBits==<span class="hljs-number">0</span>)? <span class="hljs-number">64</span> : numOfBits;<span class="hljs-comment">//A fix to get the correct number of bits for arrays</span>
+		StoreInst* varVal = new StoreInst(paramVal, varScope[paramName], false, entry);
+		varVal-&gt;setAlignment(numOfBits/<span class="hljs-number">8</span>);
+
+		param = param-&gt;next;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-32">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-32">&#182;</a>
+              </div>
+              <p>Delegating the construction of variable delarations within the method</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_vardecl* varDecl = methodDecl-&gt;var_decl;
+	BasicBlock* insertPoint = entry;
+	<span class="hljs-keyword">while</span> (varDecl != <span class="hljs-literal">nullptr</span>){
+		insertPoint = makeVarDeclaration(mod,varDecl,varScope,func,insertPoint);
+		varDecl = varDecl-&gt;next;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-33">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-33">&#182;</a>
+              </div>
+              <p>Delegating the construction of statments within the method</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_stmt* stmt = methodDecl-&gt;body;
+	<span class="hljs-keyword">while</span> (stmt != <span class="hljs-literal">nullptr</span>){
+		insertPoint = makeStatement(mod,stmt,varScope,func,insertPoint,&amp;classFields);
+		stmt = stmt-&gt;next;
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-34">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-34">&#182;</a>
+              </div>
+              <p>Retrieving a reference to the return value and constructing code to return it</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	Value* retVal;
+	<span class="hljs-built_in">std</span>::tie(retVal,insertPoint) = makeExpression(mod,methodDecl-&gt;return_expr,varScope,func,insertPoint,&amp;classFields);
+	ReturnInst::Create(mod-&gt;getContext(), retVal, insertPoint);	
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-35">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-35">&#182;</a>
+              </div>
+              <p>Takes an ast_vardecl and constructs it</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function">BasicBlock* <span class="hljs-title">makeVarDeclaration</span><span class="hljs-params">(Module* mod, ast_vardecl* varDecl,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; &amp;varScope, Function* parentFunc, BasicBlock* parentBB )</span></span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-36">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-36">&#182;</a>
+              </div>
+              <p>First we attach a new basicblock that we can append our instructions to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	BasicBlock* declaration = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>, parentFunc);
+	attachNewBasicBlock(mod,parentBB,declaration);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-37">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-37">&#182;</a>
+              </div>
+              <p>Getting the variable type that needs to be declared</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	Type* declType = makeType(mod,varDecl-&gt;type);
+	<span class="hljs-keyword">int</span> numOfBits = declType-&gt;getPrimitiveSizeInBits();</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-38">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-38">&#182;</a>
+              </div>
+              <p>Allocating space for our new variable and storing a reference to it in the scope</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">varNameToDeclare</span><span class="hljs-params">(varDecl-&gt;id)</span></span>;
+	AllocaInst* ptr_var = new AllocaInst(declType, varNameToDeclare, declaration);
+	ptr_var-&gt;setAlignment(numOfBits/<span class="hljs-number">8</span>);
+	varScope[varNameToDeclare] = ptr_var;
+
+	return declaration;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-39">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-39">&#182;</a>
+              </div>
+              <p>Takes an ast_stmt and consturcts it
+Returns a reference to a basicblock that subsequent code can be attatched to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function">BasicBlock* <span class="hljs-title">makeStatement</span><span class="hljs-params">(Module* mod,ast_stmt* stmt, <span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; &amp;varScope, Function* parentFunc, BasicBlock* parentBB,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,ConstantInt*&gt; *classFields)</span></span>{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-40">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-40">&#182;</a>
+              </div>
+              <p>First we attach a new basicblock that we can append our instructions to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	BasicBlock* statement;
+	statement = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>, parentFunc);
+	attachNewBasicBlock(mod,parentBB,statement);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-41">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-41">&#182;</a>
+              </div>
+              <p>Based on the type of the statement, we will construct that kind of statement</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	ast_stmt_type stmtType = stmt-&gt;type;
+	<span class="hljs-keyword">switch</span>(stmtType){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-42">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-42">&#182;</a>
+              </div>
+              <p>Statement of form {stmt*}</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> BLOCK:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-43">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-43">&#182;</a>
+              </div>
+              <p>Constructs a new scope and recursively makes statements under that scope<br>We invoke the copy constructor to create a new scope that may be modified</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; newScope = varScope;
+			ast_stmt* subStmt = stmt-&gt;stmt_list;
+			BasicBlock* tmpBlock = statement;
+			<span class="hljs-keyword">while</span> (subStmt!=<span class="hljs-literal">nullptr</span>){
+				tmpBlock = makeStatement(mod,subStmt,newScope,parentFunc,tmpBlock,classFields);
+				subStmt = subStmt-&gt;next;
+			}	
+			return tmpBlock;
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-44">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-44">&#182;</a>
+              </div>
+              <p>Statement of form if (expr) stmt else stmt</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> IF_ELSE:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-45">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-45">&#182;</a>
+              </div>
+              <p>First we construct code to retireve the condition    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* cond;
+			<span class="hljs-built_in">std</span>::tie(cond,statement) = makeExpression(mod,stmt-&gt;cond,varScope,parentFunc,statement,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-46">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-46">&#182;</a>
+              </div>
+              <p>We evaluate the condition, and decide which block to branch to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			CastInst* condAsI1 = new TruncInst(cond, IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">1</span>), <span class="hljs-string">""</span>, statement);
+			BasicBlock* thenBlock = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>,parentFunc);
+			BasicBlock* elseBlock = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>,parentFunc);
+			BranchInst::Create(thenBlock, elseBlock, condAsI1, statement);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-47">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-47">&#182;</a>
+              </div>
+              <p>Constructing the statements inside of each respective branch</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			BasicBlock* endOfThen = makeStatement(mod,stmt-&gt;true_branch,varScope,parentFunc,thenBlock,classFields);
+			BasicBlock* endOfElse = makeStatement(mod,stmt-&gt;false_branch,varScope,parentFunc,elseBlock,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-48">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-48">&#182;</a>
+              </div>
+              <p>Returning control flow to after if statement</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			BasicBlock* stmtExit = BasicBlock::Create(mod-&gt;getContext(),<span class="hljs-string">""</span>,parentFunc);
+			attachNewBasicBlock(mod,endOfElse,stmtExit);
+			attachNewBasicBlock(mod,endOfThen,stmtExit);		
+			return stmtExit;
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-49">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-49">&#182;</a>
+              </div>
+              <p>Statement of form while (Expr) statement</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> WHILE_STMT:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-50">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-50">&#182;</a>
+              </div>
+              <p>First we construct code to retireve the condition        </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			BasicBlock* condBlock = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>,parentFunc);
+			attachNewBasicBlock(mod,statement,condBlock);
+			Value* cond;
+			BasicBlock* tempBlock;
+			<span class="hljs-built_in">std</span>::tie(cond,tempBlock) = makeExpression(mod,stmt-&gt;cond,varScope,parentFunc,condBlock,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-51">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-51">&#182;</a>
+              </div>
+              <p>We evaluate the condition, and decide which block to branch to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			CastInst* condAsI1 = new TruncInst(cond, IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">1</span>), <span class="hljs-string">""</span>, tempBlock);
+			BasicBlock* trueBlock = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>,parentFunc);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-52">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-52">&#182;</a>
+              </div>
+              <p>The false block is where we go if the cond evaluates to false and the loop is exited</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			BasicBlock* falseBlock = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>,parentFunc);
+			BranchInst::Create(trueBlock, falseBlock, condAsI1, tempBlock);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-53">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-53">&#182;</a>
+              </div>
+              <p>Constructing statements within the while loop</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			BasicBlock* endOfTrue = makeStatement(mod,stmt-&gt;true_branch,varScope,parentFunc,trueBlock,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-54">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-54">&#182;</a>
+              </div>
+              <p>Sending control flow back to the condition</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			attachNewBasicBlock(mod,endOfTrue,condBlock);
+			
+			return falseBlock;
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-55">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-55">&#182;</a>
+              </div>
+              <p>Statement of form System.out.println(expr)</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> SYS_OUT:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-56">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-56">&#182;</a>
+              </div>
+              <p>Constructing code to retrieve value to be printed        </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* valToPrint;
+			<span class="hljs-built_in">std</span>::tie(valToPrint,statement) = makeExpression(mod,stmt-&gt;expr,varScope,parentFunc,statement,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-57">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-57">&#182;</a>
+              </div>
+              <p>Setting up code to call native printf</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			GlobalVariable* globalString = new GlobalVariable(*mod,ArrayType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>), <span class="hljs-number">4</span>),true,GlobalValue::PrivateLinkage,<span class="hljs-number">0</span>,<span class="hljs-string">".str"</span>);
+			globalString-&gt;setAlignment(<span class="hljs-number">1</span>);
+			Constant *formatStringArray = ConstantDataArray::getString(mod-&gt;getContext(), <span class="hljs-string">"%d\x0A"</span>, true);
+			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Constant*&gt; indices;
+			ConstantInt* zeroInt = ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>));
+			indices.push_back(zeroInt);
+			indices.push_back(zeroInt);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-58">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-58">&#182;</a>
+              </div>
+              <p>Retrieving the already declared format string used for printing ints</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Constant* formatString = ConstantExpr::getGetElementPtr(globalString, indices);			
+			globalString-&gt;setInitializer(formatStringArray);			
+			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Value*&gt; printfParams;
+			printfParams.push_back(formatString);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-59">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-59">&#182;</a>
+              </div>
+              <p>Inserting the val to be printed</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			printfParams.push_back(valToPrint);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-60">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-60">&#182;</a>
+              </div>
+              <p>Performing printf call</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			CallInst* printFCall = CallInst::Create(methodScope[<span class="hljs-string">"C:: printf"</span>], printfParams, <span class="hljs-string">""</span>, statement);
+			printFCall-&gt;setCallingConv(CallingConv::C);
+			printFCall-&gt;setTailCall(<span class="hljs-literal">false</span>);
+			AttributeSet callAttrs;
+			printFCall-&gt;setAttributes(callAttrs);				
+			return statement;
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-61">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-61">&#182;</a>
+              </div>
+              <p>Statement of form identifier = expression;    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> VAR_ASSIGN:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-62">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-62">&#182;</a>
+              </div>
+              <p>Retrieving the value to be assigned    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">varName</span><span class="hljs-params">(stmt-&gt;id)</span></span>;
+			Value* valToStore;
+			<span class="hljs-built_in">std</span>::tie(valToStore,statement) = makeExpression(mod,stmt-&gt;assign_expr,varScope,parentFunc,statement,classFields);
+
+			<span class="hljs-keyword">int</span> numOfBits = valToStore-&gt;getType()-&gt;getPrimitiveSizeInBits();
+			numOfBits = (numOfBits==<span class="hljs-number">0</span>)? <span class="hljs-number">64</span> : numOfBits;<span class="hljs-comment">//A fix to get the correct number of bits for arrays</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-63">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-63">&#182;</a>
+              </div>
+              <p>Here he search for the identifier in the variable scope, then the class fields, and finally if that fails we produce an error</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* varRef = <span class="hljs-literal">nullptr</span>;
+			<span class="hljs-keyword">if</span> (varScope.find(varName)==varScope.end()){
+				<span class="hljs-keyword">if</span> ((*classFields)[varName]!=<span class="hljs-literal">nullptr</span>){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-64">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-64">&#182;</a>
+              </div>
+              <p>Using this and the offset stored in classfields to retrieve a reference to the field</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>					LoadInst* ptr_this = new LoadInst(varScope[<span class="hljs-string">"this"</span>], <span class="hljs-string">""</span>, false, statement);
+					<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Value*&gt; indices;
+					indices.push_back(ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>)));
+					indices.push_back((*classFields)[varName]);
+					varRef = GetElementPtrInst::Create(ptr_this, indices, <span class="hljs-string">""</span>, statement);
+				}<span class="hljs-keyword">else</span>{
+					error_message(stmt-&gt;lineno,<span class="hljs-string">"cannot find symbol: %s"</span>,stmt-&gt;id);
+				}
+			}<span class="hljs-keyword">else</span>{
+				varRef = varScope[varName];
+			}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-65">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-65">&#182;</a>
+              </div>
+              <p>Instructions to actually store the value in the memory pointed to by the variable</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			StoreInst* varVal = new StoreInst(valToStore, varRef, false, statement);
+			varVal-&gt;setAlignment(numOfBits/<span class="hljs-number">8</span>);			
+			return statement;
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-66">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-66">&#182;</a>
+              </div>
+              <p>Statement of form id[expr] = expression    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> ARRAY_ASSIGN:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-67">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-67">&#182;</a>
+              </div>
+              <p>Evaluating the expressions to be used in assignment        </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">varName</span><span class="hljs-params">(stmt-&gt;id)</span></span>;
+			Value* indice;
+			<span class="hljs-built_in">std</span>::tie(indice,statement) = makeExpression(mod,stmt-&gt;array_index,varScope,parentFunc,statement,classFields);
+			Value* valToStore;
+			<span class="hljs-built_in">std</span>::tie(valToStore,statement) = makeExpression(mod,stmt-&gt;assign_expr,varScope,parentFunc,statement,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-68">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-68">&#182;</a>
+              </div>
+              <p>In our implementation of arrays the first index is the length of the array and all other elements are offset
+Therefore we always add 1 to the requested index</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			indice = BinaryOperator::Create(Instruction::Add, indice, ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"1"</span>), <span class="hljs-number">10</span>)), <span class="hljs-string">""</span>, statement);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-69">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-69">&#182;</a>
+              </div>
+              <p>Here he search for the identifier in the variable scope, then the class fields, and finally if that fails we produce an error</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* varRef = <span class="hljs-literal">nullptr</span>;
+			<span class="hljs-keyword">if</span> (varScope.find(varName)==varScope.end()){
+				<span class="hljs-keyword">if</span> ((*classFields)[varName]!=<span class="hljs-literal">nullptr</span>){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-70">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-70">&#182;</a>
+              </div>
+              <p>Using this and the offset stored in classfields to retrieve a reference to the field</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>					LoadInst* ptr_this = new LoadInst(varScope[<span class="hljs-string">"this"</span>], <span class="hljs-string">""</span>, false, statement);
+					<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Value*&gt; indices;
+					indices.push_back(ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>)));
+					indices.push_back((*classFields)[varName]);
+					varRef = GetElementPtrInst::Create(ptr_this, indices, <span class="hljs-string">""</span>, statement);
+				}<span class="hljs-keyword">else</span>{
+					error_message(stmt-&gt;lineno,<span class="hljs-string">"cannot find symbol: %s"</span>,stmt-&gt;id);
+				}
+			}<span class="hljs-keyword">else</span>{
+				varRef = varScope[varName];
+			}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-71">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-71">&#182;</a>
+              </div>
+              <p>Getting reference to element that needs to be assigned to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			LoadInst* arrPointer = new LoadInst(varRef, <span class="hljs-string">""</span>, false, statement);
+			arrPointer-&gt;setAlignment(<span class="hljs-number">8</span>);
+			GetElementPtrInst* elementPointer = GetElementPtrInst::Create(arrPointer, indice, <span class="hljs-string">""</span>, statement);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-72">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-72">&#182;</a>
+              </div>
+              <p>Instructions to actually store the value in the memory pointed to by the element</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			StoreInst* storedElement = new StoreInst(valToStore, elementPointer, false, statement);
+			storedElement-&gt;setAlignment(<span class="hljs-number">4</span>);			
+			return statement;
+			<span class="hljs-keyword">break</span>;
+		}
+		<span class="hljs-keyword">default</span>:{
+			<span class="hljs-keyword">break</span>;
+		}
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-73">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-73">&#182;</a>
+              </div>
+              <p>In any other case we return an empty statement</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	return statement;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-74">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-74">&#182;</a>
+              </div>
+              <p>Takes an ast_expr and returns a Value corresponding to the expressions evaluation</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">std</span>::tuple&lt;Value*,BasicBlock*&gt; makeExpression(Module* mod, ast_expr* expr,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,Value*&gt; &amp;varScope, Function* parentFunc, BasicBlock* parentBB,<span class="hljs-built_in">std</span>::<span class="hljs-built_in">map</span>&lt;<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>,ConstantInt*&gt; *classFields){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-75">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-75">&#182;</a>
+              </div>
+              <p>First we attach a new basicblock that we can append our instructions to</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	BasicBlock* expression;
+	<span class="hljs-keyword">if</span> (parentFunc!=<span class="hljs-literal">nullptr</span> &amp;&amp; parentBB!=<span class="hljs-literal">nullptr</span>){
+		expression = BasicBlock::Create(mod-&gt;getContext(), <span class="hljs-string">""</span>, parentFunc);
+		attachNewBasicBlock(mod,parentBB,expression);
+	}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-76">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-76">&#182;</a>
+              </div>
+              <p>Based on the expression type, we will evaluate that kind of expression</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	Value* exprToReturn = <span class="hljs-literal">nullptr</span>;
+	ast_expr_type exprType = expr-&gt;type;
+	<span class="hljs-keyword">switch</span>(exprType){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-77">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-77">&#182;</a>
+              </div>
+              <p>integer_literal</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> INT_CONST:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-78">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-78">&#182;</a>
+              </div>
+              <p>Creating an int constant value    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span> valToMake = <span class="hljs-built_in">std</span>::to_string((int)expr-&gt;int_const);
+			exprToReturn = ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(valToMake), <span class="hljs-number">10</span>));			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-79">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-79">&#182;</a>
+              </div>
+              <p>boolean_literal</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> BOOL_CONST:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-80">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-80">&#182;</a>
+              </div>
+              <p>Creating an bool constant value        </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span> valToMake = expr-&gt;bool_const ? <span class="hljs-string">"1"</span> : <span class="hljs-string">"0"</span>;
+			exprToReturn = ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">8</span>, StringRef(valToMake), <span class="hljs-number">10</span>));			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-81">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-81">&#182;</a>
+              </div>
+              <p>expr  ( “&amp;&amp;” | “&lt;” | “+” | “-“ | “*” ) expr</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> BINOP:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-82">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-82">&#182;</a>
+              </div>
+              <p>First we figure out which binop this will be    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Instruction::BinaryOps opType;
+			<span class="hljs-keyword">switch</span>(expr-&gt;oper){
+				<span class="hljs-keyword">case</span> PLUS:<span class="hljs-comment">//+</span>
+					opType = Instruction::Add;
+					<span class="hljs-keyword">break</span>;
+				<span class="hljs-keyword">case</span> MINUS:<span class="hljs-comment">//-</span>
+					opType = Instruction::Sub;
+					<span class="hljs-keyword">break</span>;
+				<span class="hljs-keyword">case</span> MULT:<span class="hljs-comment">//*</span>
+					opType = Instruction::Mul;
+					<span class="hljs-keyword">break</span>;
+				<span class="hljs-keyword">case</span> AND:<span class="hljs-comment">//&amp;&amp;</span>
+					opType = Instruction::And;
+					<span class="hljs-keyword">break</span>;
+				<span class="hljs-keyword">case</span> LESS:<span class="hljs-comment">//&lt;</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-83">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-83">&#182;</a>
+              </div>
+              <p>This case is handled below</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>					<span class="hljs-keyword">break</span>;
+
+			}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-84">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-84">&#182;</a>
+              </div>
+              <p>Now we get the left and right operand expressions</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* leftExpr;
+			<span class="hljs-built_in">std</span>::tie(leftExpr,expression) = makeExpression(mod,expr-&gt;lhs,varScope,parentFunc,expression,classFields);
+			Value* rightExpr;
+			<span class="hljs-built_in">std</span>::tie(rightExpr,expression) = makeExpression(mod,expr-&gt;rhs,varScope,parentFunc,expression,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-85">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-85">&#182;</a>
+              </div>
+              <p>Finally we create teh instruction for the operation</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-keyword">if</span> (expr-&gt;oper!=LESS){				
+				exprToReturn = BinaryOperator::Create(opType, leftExpr, rightExpr, <span class="hljs-string">""</span>, expression);
+			}<span class="hljs-keyword">else</span>{				
+				ICmpInst* comparison = new ICmpInst(*expression, ICmpInst::ICMP_SLT, leftExpr, rightExpr, <span class="hljs-string">""</span>);
+  				exprToReturn = new ZExtInst(comparison, IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>), <span class="hljs-string">""</span>, expression);
+			}			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-86">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-86">&#182;</a>
+              </div>
+              <p>!expr</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> NOT_EXPR:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-87">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-87">&#182;</a>
+              </div>
+              <p>Retrieving the bool expr to be not-ed</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* boolExpr;
+			<span class="hljs-built_in">std</span>::tie(boolExpr,expression) = makeExpression(mod,expr-&gt;expr,varScope,parentFunc,expression,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-88">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-88">&#182;</a>
+              </div>
+              <p>Performing negate instruction using an xor</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			CastInst* truncdBool = new TruncInst(boolExpr, IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">1</span>), <span class="hljs-string">""</span>, expression);
+			BinaryOperator* negatedBool = BinaryOperator::Create(Instruction::Xor, truncdBool, ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">1</span>, StringRef(<span class="hljs-string">"-1"</span>), <span class="hljs-number">10</span>)), <span class="hljs-string">""</span>, expression);
+			exprToReturn = new ZExtInst(negatedBool, IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>), <span class="hljs-string">""</span>, expression);			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-89">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-89">&#182;</a>
+              </div>
+              <p>new int[expr]</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> NEW_INT_ARRAY:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-90">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-90">&#182;</a>
+              </div>
+              <p>First we get the requested array size</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* arrSize;
+			<span class="hljs-built_in">std</span>::tie(arrSize,expression) = makeExpression(mod,expr-&gt;expr,varScope,parentFunc,expression,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-91">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-91">&#182;</a>
+              </div>
+              <p>In our implementation the length of an array is stored as its first element, with the others ofset by 1
+Therefore, we will increase the array size by 1</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* arrSizePlusOne = BinaryOperator::Create(Instruction::Add, arrSize, ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"1"</span>), <span class="hljs-number">10</span>)), <span class="hljs-string">""</span>, expression);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-92">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-92">&#182;</a>
+              </div>
+              <p>To allocate the space for the array, we must multiply the size number by 4.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* arrSizePlusOneTimeFour = BinaryOperator::Create(Instruction::Mul, arrSizePlusOne, ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"4"</span>), <span class="hljs-number">10</span>)), <span class="hljs-string">""</span>, expression);
+			arrSizePlusOneTimeFour = new SExtInst(arrSizePlusOneTimeFour, IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">64</span>), <span class="hljs-string">""</span>, expression);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-93">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-93">&#182;</a>
+              </div>
+              <p>Now we ask znam to allocate our new int array</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			CallInst* znamCall = CallInst::Create(methodScope[<span class="hljs-string">"C:: znam"</span>], arrSizePlusOneTimeFour, <span class="hljs-string">""</span>, expression);
+			znamCall-&gt;setCallingConv(CallingConv::C);
+			znamCall-&gt;setTailCall(<span class="hljs-literal">false</span>);
+			AttributeSet znamCallPAL;
+			{
+			 SmallVector&lt;AttributeSet, <span class="hljs-number">4</span>&gt; Attrs;
+			 AttributeSet PAS;
+			  {
+			   AttrBuilder B;
+			   B.addAttribute(Attribute::NoAlias);
+			   PAS = AttributeSet::get(mod-&gt;getContext(), <span class="hljs-number">0U</span>, B);
+			  }
+			 
+			 Attrs.push_back(PAS);
+			 {
+			  AttrBuilder B;
+			  PAS = AttributeSet::get(mod-&gt;getContext(), ~<span class="hljs-number">0U</span>, B);
+			 }
+
+			Attrs.push_back(PAS);
+			znamCallPAL = AttributeSet::get(mod-&gt;getContext(), Attrs);
+
+			}
+			znamCall-&gt;setAttributes(znamCallPAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-94">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-94">&#182;</a>
+              </div>
+              <p>Getting a pointer to the new array</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			exprToReturn = new BitCastInst(znamCall, PointerType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">32</span>), <span class="hljs-number">0</span>), <span class="hljs-string">"newint"</span>, expression);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-95">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-95">&#182;</a>
+              </div>
+              <p>Storing the array index in the zeroith element</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* zeroIndex = ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>));
+			GetElementPtrInst* elementPointer = GetElementPtrInst::Create(exprToReturn, zeroIndex, <span class="hljs-string">""</span>, expression);
+			StoreInst* storedElement = new StoreInst(arrSize, elementPointer, false, expression);
+			storedElement-&gt;setAlignment(<span class="hljs-number">4</span>);			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-96">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-96">&#182;</a>
+              </div>
+              <p>new id()</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> NEW_CLASS:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-97">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-97">&#182;</a>
+              </div>
+              <p>First we ask znwm to allocate space for a new object of type class</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">typeName</span><span class="hljs-params">(expr-&gt;id)</span></span>;			
+			Constant* sizeToAllocate = ConstantExpr::getSizeOf(classScope[<span class="hljs-string">"class."</span> + typeName]);			
+			CallInst* newCall = CallInst::Create(methodScope[<span class="hljs-string">"C:: znwm"</span>], sizeToAllocate, <span class="hljs-string">""</span>, expression);
+			newCall-&gt;setCallingConv(CallingConv::C);
+			newCall-&gt;setTailCall(<span class="hljs-literal">false</span>);
+			AttributeSet newCall_PAL;
+			{
+			 SmallVector&lt;AttributeSet, <span class="hljs-number">4</span>&gt; Attrs;
+			 AttributeSet PAS;
+			  {
+			   AttrBuilder B;
+			   B.addAttribute(Attribute::NoAlias);
+			   PAS = AttributeSet::get(mod-&gt;getContext(), <span class="hljs-number">0U</span>, B);
+			  }
+			 
+			 Attrs.push_back(PAS);
+			 {
+			  AttrBuilder B;
+			  PAS = AttributeSet::get(mod-&gt;getContext(), ~<span class="hljs-number">0U</span>, B);
+			 }
+			
+			Attrs.push_back(PAS);
+			newCall_PAL = AttributeSet::get(mod-&gt;getContext(), Attrs);
+			
+			}
+			newCall-&gt;setAttributes(newCall_PAL);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-98">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-98">&#182;</a>
+              </div>
+              <p>Saving a pointer to the new object</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			exprToReturn = new BitCastInst(newCall, PointerType::get(classScope[<span class="hljs-string">"class."</span> + typeName], <span class="hljs-number">0</span>), <span class="hljs-string">""</span>, expression);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-99">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-99">&#182;</a>
+              </div>
+              <p>Calling llvm.memset for the new memory the object will be using</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Value*&gt; memsetParams;
+			memsetParams.push_back(newCall);
+			memsetParams.push_back(ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">8</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>)));
+			memsetParams.push_back(sizeToAllocate);
+			memsetParams.push_back(ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"8"</span>), <span class="hljs-number">10</span>)));
+			memsetParams.push_back(ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">1</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>)));
+			CallInst* memsetCall = CallInst::Create(methodScope[<span class="hljs-string">"llvm:: memset"</span>], memsetParams, <span class="hljs-string">""</span>, expression);
+			memsetCall-&gt;setCallingConv(CallingConv::C);
+			memsetCall-&gt;setTailCall(<span class="hljs-literal">false</span>);
+			AttributeSet memsetCall_PAL;
+			memsetCall-&gt;setAttributes(memsetCall_PAL);			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-100">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-100">&#182;</a>
+              </div>
+              <p>expr.length</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> ARRAY_LENGTH:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-101">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-101">&#182;</a>
+              </div>
+              <p>First we get a pointer to the zeroith element of the array    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* arrToAccess;
+			<span class="hljs-built_in">std</span>::tie(arrToAccess,expression) = makeExpression(mod,expr-&gt;expr,varScope,parentFunc,expression,classFields);
+			Value* zeroIndex = ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>));
+			GetElementPtrInst* elementPointer = GetElementPtrInst::Create(arrToAccess, zeroIndex, <span class="hljs-string">""</span>, expression);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-102">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-102">&#182;</a>
+              </div>
+              <p>Then we retrieve the size value that is stored at the elemenet, as per the NEW_INT_ARRAY case</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			LoadInst* elementAccessed = new LoadInst(elementPointer, <span class="hljs-string">""</span>, false, expression);
+			elementAccessed-&gt;setAlignment(<span class="hljs-number">4</span>);
+			exprToReturn = elementAccessed;			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-103">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-103">&#182;</a>
+              </div>
+              <p>expr[expr]</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> ARRAY_INDEX:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-104">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-104">&#182;</a>
+              </div>
+              <p>First we get the relevent expressions    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* arrToAccess;
+			<span class="hljs-built_in">std</span>::tie(arrToAccess,expression) = makeExpression(mod,expr-&gt;array,varScope,parentFunc,expression,classFields);
+			Value* indexToAccess;
+			<span class="hljs-built_in">std</span>::tie(indexToAccess,expression) = makeExpression(mod,expr-&gt;array_index,varScope,parentFunc,expression,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-105">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-105">&#182;</a>
+              </div>
+              <p>As the first element is the size of the array, we offset all accesses by 1 so they access the correct element.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			indexToAccess = BinaryOperator::Create(Instruction::Add, indexToAccess, ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"1"</span>), <span class="hljs-number">10</span>)), <span class="hljs-string">""</span>, expression);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-106">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-106">&#182;</a>
+              </div>
+              <p>Retrieving the value at the index</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			GetElementPtrInst* elementPointer = GetElementPtrInst::Create(arrToAccess, indexToAccess, <span class="hljs-string">""</span>, expression);
+			LoadInst* elementAccessed = new LoadInst(elementPointer, <span class="hljs-string">""</span>, false, expression);
+			elementAccessed-&gt;setAlignment(<span class="hljs-number">4</span>);
+			exprToReturn = elementAccessed;			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-107">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-107">&#182;</a>
+              </div>
+              <p>‘this’</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> THIS_PTR:</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-108">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-108">&#182;</a>
+              </div>
+              <p>We simply treate this like any other varname, but first we must set the identifier    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			expr-&gt;id = <span class="hljs-string">"this"</span>;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-109">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-109">&#182;</a>
+              </div>
+              <p>ident</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> VARNAME:{			
+			<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">varName</span><span class="hljs-params">(expr-&gt;id)</span></span>;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-110">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-110">&#182;</a>
+              </div>
+              <p>Here he search for the identifier in the variable scope, then the class fields, and finally if that fails we produce an error</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			Value* varRef = <span class="hljs-literal">nullptr</span>;
+			<span class="hljs-keyword">if</span> (varScope.find(varName)==varScope.end()){
+				<span class="hljs-keyword">if</span> ((*classFields)[varName]!=<span class="hljs-literal">nullptr</span>){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-111">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-111">&#182;</a>
+              </div>
+              <p>Using this and the offset stored in classfields to retrieve a reference to the field</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>					LoadInst* ptr_this = new LoadInst(varScope[<span class="hljs-string">"this"</span>], <span class="hljs-string">""</span>, false, expression);
+					<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Value*&gt; indices;
+					indices.push_back(ConstantInt::get(mod-&gt;getContext(), APInt(<span class="hljs-number">32</span>, StringRef(<span class="hljs-string">"0"</span>), <span class="hljs-number">10</span>)));
+					indices.push_back((*classFields)[varName]);
+					varRef = GetElementPtrInst::Create(ptr_this, indices, <span class="hljs-string">""</span>, expression);
+				}<span class="hljs-keyword">else</span>{
+					error_message(expr-&gt;lineno,<span class="hljs-string">"cannot find symbol: %s"</span>,expr-&gt;id);
+				}
+			}<span class="hljs-keyword">else</span>{
+				varRef = varScope[varName];
+			}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-112">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-112">&#182;</a>
+              </div>
+              <p>Loading the value stored at varRef</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			LoadInst* retrievedVal = new LoadInst(varRef, <span class="hljs-string">""</span>, false, expression);
+			retrievedVal-&gt;setAlignment(<span class="hljs-number">4</span>);
+			exprToReturn = retrievedVal;			
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-113">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-113">&#182;</a>
+              </div>
+              <p>expr.id(vardelcs)</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> METHOD_CALL:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-114">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-114">&#182;</a>
+              </div>
+              <p>First we get the object to be called</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">methodName</span><span class="hljs-params">(expr-&gt;method)</span></span>;
+			<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;Value*&gt; params;
+			Value* objectVal;
+			<span class="hljs-built_in">std</span>::tie(objectVal,expression) = makeExpression(mod,expr-&gt;object,varScope,parentFunc,expression,classFields);</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-115">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-115">&#182;</a>
+              </div>
+              <p>Pushing all of the parameters to be passed, starting with ‘this’</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			params.push_back(objectVal);
+			ast_expr* param = expr-&gt;exp_list;
+			<span class="hljs-keyword">while</span>(param!=<span class="hljs-literal">nullptr</span>){
+				Value* paramVal;
+				<span class="hljs-built_in">std</span>::tie(paramVal,expression) = makeExpression(mod,param,varScope,parentFunc,expression,classFields);
+				params.push_back(paramVal);
+				param = param-&gt;next;
+			}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-116">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-116">&#182;</a>
+              </div>
+              <p>Making the method call</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			exprToReturn = CallInst::Create(methodScope[methodName], params, <span class="hljs-string">""</span>, expression);			
+			<span class="hljs-keyword">break</span>;
+		}
+		<span class="hljs-keyword">default</span>:
+			<span class="hljs-keyword">break</span>;
+	}
+	return <span class="hljs-built_in">std</span>::make_tuple(exprToReturn,expression);
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-117">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-117">&#182;</a>
+              </div>
+              <p>Takes an ast_type and returns a reference to that type</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function">Type* <span class="hljs-title">makeType</span><span class="hljs-params">(Module* mod, ast_type typeToMake)</span></span>{		
+	Type* typeObject;</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-118">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-118">&#182;</a>
+              </div>
+              <p>We match and create an reference to the requested type</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>	<span class="hljs-keyword">switch</span>(typeToMake.type){</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-119">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-119">&#182;</a>
+              </div>
+              <p>int    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> VAR_INT:{		
+			typeObject = IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">32</span>);
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-120">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-120">&#182;</a>
+              </div>
+              <p>boolean</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> VAR_BOOL:{			
+			typeObject = IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">8</span>);
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-121">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-121">&#182;</a>
+              </div>
+              <p>int[]</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> VAR_INT_ARRAY:{		
+			typeObject = PointerType::get(IntegerType::get(mod-&gt;getContext(), <span class="hljs-number">32</span>), <span class="hljs-number">0</span>);
+			<span class="hljs-keyword">break</span>;
+		}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-122">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-122">&#182;</a>
+              </div>
+              <p>identifier</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>		<span class="hljs-keyword">case</span> VAR_CLASS:{</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-123">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-123">&#182;</a>
+              </div>
+              <p>Retreiving the structtype associated with the requested classtype    </p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>			<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">classname</span><span class="hljs-params">(typeToMake.classname)</span></span>;
+			classname = <span class="hljs-string">"class."</span> +classname;			
+			typeObject = PointerType::get(classScope[classname], <span class="hljs-number">0</span>);
+			<span class="hljs-keyword">break</span>;
+		}
+		<span class="hljs-keyword">default</span>:{
+			typeObject = <span class="hljs-literal">nullptr</span>;
+			<span class="hljs-keyword">break</span>;
+		}
+	}
+	return typeObject;
+}</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-124">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-124">&#182;</a>
+              </div>
+              <p>Creates a brank from the parant block to the second block</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">attachNewBasicBlock</span><span class="hljs-params">(Module* mod, BasicBlock* parentBB, BasicBlock* &amp;bbToAttach)</span></span>{
+	IRBuilder&lt;&gt; builder(getGlobalContext());
+	builder.SetInsertPoint(parentBB);
+	builder.CreateBr(bbToAttach);
+}</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
