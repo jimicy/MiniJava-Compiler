@@ -1,5 +1,5 @@
 # MiniJava-Compiler
-Jemar Jones
+Jemar Jones  
 Jimmy Wang
 
 April 2016
