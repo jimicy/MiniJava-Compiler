@@ -5,11 +5,9 @@ Jimmy Wang
 April 2016
 
 ##Literate Programming Documentation
-
-
 In our proposal we said we were going to use noweb. However, we found docco the html literate programming tool much easier to use.
 
-To view code documentation: https://rawgit.com/Jimicy/MiniJava-Compiler/master/docs/main.html
+To view code documentation: https://rawgit.com/Jimicy/MiniJava-Compiler/master/docs/main.html  
 The links to the generated literate documentation for other code files is linked via a table of contents.
 
 ##Introduction
