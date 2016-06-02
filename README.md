@@ -5,7 +5,12 @@ Jimmy Wang
 April 2016
 
 ##Literate Programming Documentation
-View at https://rawgit.com/Jimicy/MiniJava-Compiler/master/docs/main.html
+
+
+In our proposal we said we were going to use noweb. However, we found docco the html literate programming tool much easier to use.
+
+To view code documentation: https://rawgit.com/Jimicy/MiniJava-Compiler/master/docs/main.html
+The links to the generated literate documentation for other code files is linked via a table of contents.
 
 ##Introduction
 MiniJava is a subset of Java. It's BNF can be found at [http://www.cambridge.org/resources/052182060X/MCIIJ2e/grammar.htm](http://www.cambridge.org/resources/052182060X/MCIIJ2e/grammar.htm)
@@ -118,11 +123,6 @@ The programs we used to test are in the `programs` folder
 + LinkedList.java [LinkedList does not work with our Compiler, known problem]
 
 Refer to generated `.ll` files in folder `Generated-llvm-code-from-programs` if you want to see example compiled to llvm IR code.
-
-##Code Documentation
-In our proposal we said we were going to use noweb. However, we found docco the html literate programming tool much easier to use.
-
-To view code documentation open [docs/main.html](./docs/main.html). The links to the generated literate documentation for other code files is linked via a table of contents.
 
 ##ANALYSIS AND DESIGN
 ###3 stages
