@@ -46,9 +46,9 @@ brew tap homebrew/versions
 brew install llvm36
 ~~~
 
-Add llvm homebrew to your PATH
+Add llvm homebrew to your PATH.  
+This gives you access to `llvm-config-3.6` needed to compile llvm code  
 `export PATH=/usr/local/opt/llvm36/bin:$PATH`
-This gives you access to `llvm-config-3.6` needed to compile llvm code
 
 ###Instructions for Linux
 You will need to install right versions of flex, bison and llvm.
@@ -103,6 +103,7 @@ Example: Quicksort output
 ~~~
 
 `./mjavac`
+
 1. Create a file called `QuickSort.ll`, a LLVM IR code file.
 2. Create a file called `QuickSort`, a native executable.
 3. The last file created will be called `Output_AST.txt` that represents the AST of the java file parsed.
