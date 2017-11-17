@@ -4,13 +4,13 @@ Jimmy Wang
 
 April 2016
 
-##Literate Programming Documentation
+## Literate Programming Documentation
 In our proposal we said we were going to use noweb. However, we found docco the html literate programming tool much easier to use.
 
 To view code documentation: https://rawgit.com/Jimicy/MiniJava-Compiler/master/docs/main.html  
 The links to the generated literate documentation for other code files is linked via a table of contents.
 
-##Introduction
+## Introduction
 MiniJava is a subset of Java. It's BNF can be found at [http://www.cambridge.org/resources/052182060X/MCIIJ2e/grammar.htm](http://www.cambridge.org/resources/052182060X/MCIIJ2e/grammar.htm)
 
 MiniJava-Compiler is a compiler for the MiniJava language that compiles to LLVM IR (a low level programming language similar to assembly) which then compiles to assembly for your machine.
@@ -24,8 +24,8 @@ Typical phases of a compiler
 Using Flex, Bison and LLVM. They abstract away details so we don't have to worry about them.
 ![](docs/images/new_compiler.jpg)
 
-##Building
-###Versions
+## Building
+### Versions
 
 + flex 2.5.35 ~ 2.6.0
 + bison 3.0.4
@@ -33,7 +33,7 @@ Using Flex, Bison and LLVM. They abstract away details so we don't have to worry
     - opt-3.6 (installed with llvm)
     - llc-3.6 (installed with llvm)
 
-###Instructions for OS X
+### Instructions for OS X
 
 OS X comes with flex 2.5.35
 However you need to install Bison because the OS X provided Bison is 2.3
@@ -50,7 +50,7 @@ Add llvm homebrew to your PATH.
 This gives you access to `llvm-config-3.6` needed to compile llvm code  
 `export PATH=/usr/local/opt/llvm36/bin:$PATH`
 
-###Instructions for Linux
+### Instructions for Linux
 You will need to install right versions of flex, bison and llvm.
 
 Modify the **Makefile**
@@ -67,7 +67,7 @@ opt-3.6 -S -O3 $name.ll -o $name.ll
 llc-3.6 -filetype=obj $name.ll
 ~~~
 
-##Running
+## Running
 Run `make` once
 
 `./mjavac` script that will create the `.ll` (LLVM IR) and compile it to a binary in the current directory.
@@ -108,7 +108,7 @@ Example: Quicksort output
 2. Create a file called `QuickSort`, a native executable.
 3. The last file created will be called `Output_AST.txt` that represents the AST of the java file parsed.
 
-##Tests
+## Tests
 We tested our implementation by compiling in Java and running it, then testing that against MiniJava-Compiler and running it. We checked that the output was the same.
 
 The programs we used to test are in the `programs` folder
@@ -123,8 +123,8 @@ The programs we used to test are in the `programs` folder
 
 Refer to generated `.ll` files in folder `Generated-llvm-code-from-programs` if you want to see example compiled to llvm IR code.
 
-##ANALYSIS AND DESIGN
-###3 stages
+## ANALYSIS AND DESIGN
+### 3 stages
 
 1. Tokenization (`tokens.l` - scan the `.java` file passed in)
 2. Build the AST (`parser.y` - match BNF rules and built an appropriate AST)
